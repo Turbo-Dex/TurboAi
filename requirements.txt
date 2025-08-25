@@ -5,6 +5,8 @@ pandas
 scikit-learn
 matplotlib
 torch
+ultralytics
+tensorflow
 
 # Pour GPU (CUDA) 
 # torchvision
