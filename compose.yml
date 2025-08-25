@@ -13,9 +13,9 @@ services:
       - "8888:8888"
     volumes:
       - ./workspace:/workspace
-    #runtime: nvidia
-    #deploy:
-    #  resources:
-    #    reservations:
-    #      devices:
-    #        - capabilities: [gpu]
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
