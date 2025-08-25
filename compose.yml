@@ -1,0 +1,21 @@
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: Dockerfile      
+    image: ml-jupyter:latest
+    container_name: ml-jupyter
+    restart: unless-stopped
+    environment:
+      - JUPYTER_TOKEN=password
+      - PYTHONWARNINGS=ignore
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace:/workspace
+    #runtime: nvidia
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - capabilities: [gpu]
