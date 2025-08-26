@@ -7,9 +7,9 @@ matplotlib
 torch
 ultralytics
 tensorflow
+seaborn
+torchvision
 
-# Pour GPU (CUDA) 
-# torchvision
+# Pour GPU (CUDA)# 
 # tensorboard
-# seaborn
 # accelerate
