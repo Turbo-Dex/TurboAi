@@ -1,0 +1,10 @@
+torch
+torchvision
+pillow
+fastapi
+python-multipart
+flask
+torch
+pandas
+
+
