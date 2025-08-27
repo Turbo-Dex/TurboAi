@@ -1,10 +1,9 @@
-torch
-torchvision
+# CPU-only versions
+torch==2.1.0+cpu
+torchvision==0.16.1+cpu
+# Other packages
 pillow
 fastapi
 python-multipart
 flask
-torch
 pandas
-
-
