@@ -1,6 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # CPU-only versions
-torch==2.1.0+cpu
+torch==2.1.1+cpu
 torchvision==0.16.1+cpu
+
 # Other packages
 pillow
 fastapi
