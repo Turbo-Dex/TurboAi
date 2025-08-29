@@ -1,65 +1,41 @@
-from flask import Flask, request, send_file, jsonify
-import torch
-from torchvision import transforms
-from PIL import Image
 import io
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import JSONResponse
+from PIL import Image
+from ultralytics import YOLO
+import torch
 
-# --- Device ---
-device = torch.device("cpu")
+# --- Load YOLO model on CPU ---
+model_path = "model/yolov8_classify_stanford_data.pt"
+model = YOLO(model_path).to("cpu")  # CPU-only
 
-# --- Load model ---
-# Assume blur.pt is a standard PyTorch model (state_dict or full model)
-try:
-    model = torch.jit.load("model/resnet18_turbodex_ts.pt", map_location=device)
-    model.eval()
-except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
+app = FastAPI(title="Car Classification YOLO API (CPU)")
 
-# --- Transform ---
-preprocess = transforms.Compose([
-    transforms.ToTensor()
-])
+@app.get("/")
+def read_root():
+    return {"message": "YOLO Car Classification API is running. POST an image to /predict."}
 
-postprocess = transforms.Compose([
-    transforms.ToPILImage()
-])
-
-# --- Flask app ---
-app = Flask(__name__)
-
-@app.route("/blur", methods=["POST"])
-def blur_image():
-    if model is None:
-        return jsonify({"error": "Model not loaded"}), 500
-
-    if "image" not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
-
-    file = request.files["image"]
+@app.post("/predict/")
+async def predict(file: UploadFile = File(...)):
     try:
-        pil_img = Image.open(file).convert("RGB")
+        # Read uploaded image
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        # Run YOLO inference on CPU
+        results = model.predict(image, device="cpu")
+
+        # Extract top classification prediction
+        probs = results[0].probs
+        top_idx = int(probs.top1)
+        confidence = float(probs.top1conf)
+        class_name = results[0].names[top_idx]
+
+        return JSONResponse({
+            "class": class_name,
+            "confidence": confidence,
+            "class_id": top_idx
+        })
+
     except Exception as e:
-        return jsonify({"error": f"Invalid image: {e}"}), 400
-
-    # Preprocess
-    input_tensor = preprocess(pil_img).unsqueeze(0).to(device)
-
-    # Model inference
-    with torch.no_grad():
-        output_tensor = model(input_tensor)
-
-    # Convert output tensor to PIL image
-    output_tensor = output_tensor.squeeze(0).cpu().clamp(0, 1)
-    output_img = postprocess(output_tensor)
-
-    # Encode as JPEG
-    buf = io.BytesIO()
-    output_img.save(buf, format="JPEG")
-    buf.seek(0)
-
-    return send_file(buf, mimetype="image/jpeg", as_attachment=False, download_name="blurred.jpg")
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+        return JSONResponse({"error": str(e)}, status_code=500)

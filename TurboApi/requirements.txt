@@ -1,12 +1,19 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# CPU-only versions
+# CPU-only PyTorch
 torch==2.1.1+cpu
 torchvision==0.16.1+cpu
 
-# Other packages
-pillow
+# Core dependencies
+flask
 fastapi
 python-multipart
-flask
+pillow
 pandas
+numpy<2
+
+# YOLO
+ultralytics
+
+# Server
+uvicorn[standard]
