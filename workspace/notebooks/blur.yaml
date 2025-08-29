@@ -1,0 +1,6 @@
+train: blur_dataset/images/train
+val: blur_dataset/images/valid
+test: blur_dataset/images/test
+
+nc: 2
+names: ['face', 'license_plate']
