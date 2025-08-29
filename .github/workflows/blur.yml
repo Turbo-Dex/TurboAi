@@ -1,0 +1,45 @@
+name: Build & Push TurboBlur on new model
+
+on:
+  push:
+    paths:
+      - 'TurboBlur/model/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Detect newly added files
+        id: check_new
+        run: |
+          git fetch origin ${{ github.event.before }}
+          NEW_FILES=$(git diff --name-status ${{ github.event.before }} ${{ github.sha }} | grep '^A' | awk '{print $2}')
+          echo "New files: $NEW_FILES"
+          if [ -z "$NEW_FILES" ]; then
+            echo "no_new=true" >> $GITHUB_OUTPUT
+          else
+            echo "no_new=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stop if no new files
+        if: steps.check_new.outputs.no_new == 'true'
+        run: |
+          echo "No new model file added, skipping build."
+          exit 0
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }} # turbodexacr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build & Push TurboBlur Docker image
+        run: |
+          IMAGE_NAME=${{ secrets.ACR_LOGIN_SERVER }}/car-blur
+          docker build -t $IMAGE_NAME:latest ./TurboBlur
+          docker push $IMAGE_NAME:latest

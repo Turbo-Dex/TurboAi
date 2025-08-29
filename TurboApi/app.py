@@ -1,13 +1,14 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, send_file, jsonify
 import torch
 from torchvision import transforms
 from PIL import Image
-import pandas as pd
+import io
 
-# --- Device configuration ---
-device = torch.device("cpu")  # Force CPU
+# --- Device ---
+device = torch.device("cpu")
 
-# --- Load the model ---
+# --- Load model ---
+# Assume blur.pt is a standard PyTorch model (state_dict or full model)
 try:
     model = torch.jit.load("model/resnet18_turbodex_ts.pt", map_location=device)
     model.eval()
@@ -15,28 +16,20 @@ except Exception as e:
     print(f"Error loading model: {e}")
     model = None
 
-# --- Load class names ---
-try:
-    classes_df = pd.read_csv("classes_compcars.csv")
-    class_map = {row['ClassIndex']: row['ClassName'] for _, row in classes_df.iterrows()}
-except Exception as e:
-    print(f"Error loading class CSV: {e}")
-    class_map = {}
-
-# --- Image preprocessing ---
+# --- Transform ---
 preprocess = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+    transforms.ToTensor()
+])
+
+postprocess = transforms.Compose([
+    transforms.ToPILImage()
 ])
 
 # --- Flask app ---
 app = Flask(__name__)
 
-@app.route("/predict", methods=["POST"])
-def predict():
+@app.route("/blur", methods=["POST"])
+def blur_image():
     if model is None:
         return jsonify({"error": "Model not loaded"}), 500
 
@@ -45,30 +38,28 @@ def predict():
 
     file = request.files["image"]
     try:
-        img = Image.open(file).convert("RGB")
+        pil_img = Image.open(file).convert("RGB")
     except Exception as e:
         return jsonify({"error": f"Invalid image: {e}"}), 400
 
     # Preprocess
-    input_tensor = preprocess(img).unsqueeze(0).to(device)
+    input_tensor = preprocess(pil_img).unsqueeze(0).to(device)
 
-    # Predict
+    # Model inference
     with torch.no_grad():
-        output = model(input_tensor)
-        probabilities = torch.nn.functional.softmax(output[0], dim=0)
-        top5_prob, top5_catid = torch.topk(probabilities, 5)
+        output_tensor = model(input_tensor)
 
-    # Build response
-    results = []
-    for i in range(top5_prob.size(0)):
-        idx = top5_catid[i].item()
-        results.append({
-            "ClassIndex": idx,
-            "ClassName": class_map.get(idx, "Unknown"),
-            "Probability": float(top5_prob[i].item())
-        })
+    # Convert output tensor to PIL image
+    output_tensor = output_tensor.squeeze(0).cpu().clamp(0, 1)
+    output_img = postprocess(output_tensor)
 
-    return jsonify({"predictions": results})
+    # Encode as JPEG
+    buf = io.BytesIO()
+    output_img.save(buf, format="JPEG")
+    buf.seek(0)
+
+    return send_file(buf, mimetype="image/jpeg", as_attachment=False, download_name="blurred.jpg")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
