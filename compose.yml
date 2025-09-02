@@ -8,7 +8,7 @@ services:
     image: ml-jupyter:latest
     container_name: ml-jupyter
     restart: unless-stopped
-    shm_size: "${SHM_SIZE:-4gb}"
+    shm_size: "${SHM_SIZE:-16g}"
     environment:
       - JUPYTER_TOKEN=password
       - PYTHONWARNINGS=ignore

@@ -9,6 +9,10 @@ ultralytics
 tensorflow
 seaborn
 torchvision
+kagglehub
+tqdm
+ipywidgets
+timm
 
 # Pour GPU (CUDA)# 
 # tensorboard
