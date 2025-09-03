@@ -1,41 +1,70 @@
-import io
+import torch
+import timm
+from torchvision import transforms
+from PIL import Image
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
-from PIL import Image
-from ultralytics import YOLO
-import torch
 
-# --- Load YOLO model on CPU ---
-model_path = "model/yolov8_classify_stanford_data.pt"
-model = YOLO(model_path).to("cpu")  # CPU-only
+# -----------------------------
+# Configuration
+# -----------------------------
+MODEL_NAME = "swin_large_patch4_window7_224"
+CHECKPOINT_PATH = "/app/model/swin_car_model_with_classes.pth"
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-app = FastAPI(title="Car Classification YOLO API (CPU)")
+# -----------------------------
+# Chargement du modèle + mapping
+# -----------------------------
+checkpoint = torch.load(CHECKPOINT_PATH, map_location="cpu")
 
-@app.get("/")
-def read_root():
-    return {"message": "YOLO Car Classification API is running. POST an image to /predict."}
+num_classes = len(checkpoint["class_to_idx"])
+model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=num_classes)
+model.load_state_dict(checkpoint["model_state"])
+model.to(DEVICE)
+model.eval()
 
-@app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
-    try:
-        # Read uploaded image
-        image_bytes = await file.read()
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+# Mapping idx -> nom de classe
+class_to_idx = checkpoint["class_to_idx"]
+idx_to_class = {v: k for k, v in class_to_idx.items()}
 
-        # Run YOLO inference on CPU
-        results = model.predict(image, device="cpu")
+# -----------------------------
+# Prétraitement image
+# -----------------------------
+transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225]),
+])
 
-        # Extract top classification prediction
-        probs = results[0].probs
-        top_idx = int(probs.top1)
-        confidence = float(probs.top1conf)
-        class_name = results[0].names[top_idx]
+def predict(image: Image.Image, topk: int = 5):
+    image = image.convert("RGB")
+    input_tensor = transform(image).unsqueeze(0).to(DEVICE)
+    with torch.no_grad():
+        outputs = model(input_tensor)
+        probs = torch.nn.functional.softmax(outputs, dim=1)
+        top_prob, top_idx = torch.topk(probs, topk)
 
-        return JSONResponse({
-            "class": class_name,
-            "confidence": confidence,
-            "class_id": top_idx
+    results = []
+    for i in range(topk):
+        idx = top_idx[0][i].item()
+        prob = top_prob[0][i].item()
+        class_name = idx_to_class.get(idx, str(idx))
+        results.append({
+            "class_id": idx,
+            "class_name": class_name,
+            "probability": prob
         })
+    return results
 
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+# -----------------------------
+# FastAPI server
+# -----------------------------
+app = FastAPI()
+
+@app.post("/predict")
+async def predict_endpoint(file: UploadFile = File(...)):
+    image = Image.open(file.file)
+    results = predict(image, topk=5)
+    return JSONResponse({"top5_predictions": results})
