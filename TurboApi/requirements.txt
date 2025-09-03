@@ -5,15 +5,10 @@ torch==2.1.1+cpu
 torchvision==0.16.1+cpu
 
 # Core dependencies
-flask
 fastapi
+uvicorn[standard]
 python-multipart
 pillow
 pandas
 numpy<2
-
-# YOLO
-ultralytics
-
-# Server
-uvicorn[standard]
+timm
