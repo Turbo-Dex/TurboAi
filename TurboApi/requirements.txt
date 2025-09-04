@@ -1,0 +1,14 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# CPU-only PyTorch
+torch==2.1.1+cpu
+torchvision==0.16.1+cpu
+
+# Core dependencies
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+pandas
+numpy<2
+timm

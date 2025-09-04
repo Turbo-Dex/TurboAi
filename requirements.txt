@@ -1,0 +1,19 @@
+jupyterlab
+notebook
+numpy
+pandas
+scikit-learn
+matplotlib
+torch
+ultralytics
+tensorflow
+seaborn
+torchvision
+kagglehub
+tqdm
+ipywidgets
+timm
+
+# Pour GPU (CUDA)# 
+# tensorboard
+# accelerate
